@@ -53,22 +53,30 @@ async def register_session(ctx, *, args: str):
     else:
         await ctx.send(msg)
 
-    # 지각 기록 반영 개인별 DM
-    from datetime import datetime
+    # 개인별 DM - 지각 3회 이상이면 30분 일찍 공지
+    from datetime import datetime, timedelta
     try:
-        from late_manager import make_personal_session_notice
+        from late_manager import get_late_records
         session_start = datetime.strptime(f"{date} {time_}", "%Y-%m-%d %H:%M")
+        early_time = (session_start - timedelta(minutes=30)).strftime("%H:%M")
+
         for member in ctx.guild.members:
             if member.bot:
                 continue
-            personal_msg = make_personal_session_notice(
-                session_title=title,
-                session_start=session_start,
-                location=location,
-                member_id=member.id,
-            )
             try:
-                await member.send(personal_msg)
+                records = get_late_records(member.id)
+                if len(records) >= 3:
+                    notify_time = early_time
+                else:
+                    notify_time = time_
+
+                dm_msg = (
+                    f"📢 **{title}** 세션 공지\n"
+                    f"📅 날짜: {date}\n"
+                    f"⏰ 시간: **{notify_time}**\n"
+                    f"📍 장소: {location}\n"
+                )
+                await member.send(dm_msg)
             except Exception:
                 pass
     except ImportError:
