@@ -20,6 +20,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     init_db()
     start_scheduler(bot)
+    await bot.tree.sync()
     print(f"✅ 봇 실행 중: {bot.user}")
 
 
@@ -152,5 +153,23 @@ async def help_command(ctx):
     )
     await ctx.send(msg)
 
+@bot.tree.command(name="upload_material", description="발표자료를 업로드하고 퀴즈를 생성합니다.")
+async def upload_material(
+    interaction: discord.Interaction,
+    session_id: int,
+    file: discord.Attachment
+):
+    await interaction.response.defer(ephemeral=True)
+    from material_reader import extract_text_from_discord_attachment
+    from quiz_ai import generate_quiz_from_text
+
+    text = await extract_text_from_discord_attachment(file)
+    if not text:
+        await interaction.followup.send("❌ 파일에서 텍스트를 읽을 수 없어요.", ephemeral=True)
+        return
+
+    quiz = await generate_quiz_from_text(text)
+    await interaction.followup.send("✅ 퀴즈 생성 완료! DM으로 보냈어요.", ephemeral=True)
+    await interaction.user.send(quiz)
 
 bot.run(TOKEN)
