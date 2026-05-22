@@ -110,12 +110,10 @@ async def check_attendance(ctx, session_id: int, arrived_at: str):
 
 
 # ── 지각 기록 입력 (운영진) ───────────────────────────────
-@bot.tree.command(name="late", description="운영진: 지각 기록 입력")
-async def late_record(
+@bot.tree.command(name="upload_material", description="발표자료를 업로드하고 퀴즈를 생성합니다.")
+async def upload_material(
     interaction: discord.Interaction,
-    member: discord.Member,
-    minutes: int,
-    session_date: str
+    file: discord.Attachment
 ):
     try:
         from late_manager import add_late_record, make_late_record_dm
