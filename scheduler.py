@@ -1,23 +1,21 @@
 import os
+import asyncio
 from discord.ext import tasks
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def start_scheduler(bot):
-    """봇 시작 시 주기적 작업 등록"""
+    daily_check.start(bot)
     weekly_ranking.start(bot)
     print("✅ 스케줄러 시작")
 
 
-@tasks.loop(hours=168)  # 매주 실행 (7일 * 24시간)
-async def weekly_ranking(bot):
-    """매주 월요일 오전 9시에 지각 순위 자동 공지"""
+@tasks.loop(hours=24)
+async def daily_check(bot):
+    """매일 오전 9시 — 내일 세션 있으면 자동 리마인드"""
     now = datetime.now()
-    # 월요일(0) + 오전 9시 체크
-    if now.weekday() != 0 or now.hour != 9:
+    if now.hour != 9:
         return
-
-    from db import get_late_ranking
 
     channel_id = os.getenv("ANNOUNCE_CHANNEL_ID")
     if not channel_id:
@@ -27,6 +25,40 @@ async def weekly_ranking(bot):
     if not channel:
         return
 
+    from db import get_all_sessions
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    sessions = get_all_sessions()
+
+    for s in sessions:
+        if s["date"] == tomorrow:
+            msg = (
+                f"🔔 **내일 세션 리마인드!**\n"
+                f"📌 {s['title']}\n"
+                f"📅 날짜: {s['date']}\n"
+                f"⏰ 시간: {s['time']}\n"
+                f"📍 장소: {s['location']}\n"
+            )
+            if s["material_url"]:
+                msg += f"📎 자료: {s['material_url']}\n"
+            await channel.send(msg)
+
+
+@tasks.loop(hours=168)
+async def weekly_ranking(bot):
+    """매주 월요일 오전 9시에 지각 순위 자동 공지"""
+    now = datetime.now()
+    if now.weekday() != 0 or now.hour != 9:
+        return
+
+    channel_id = os.getenv("ANNOUNCE_CHANNEL_ID")
+    if not channel_id:
+        return
+
+    channel = bot.get_channel(int(channel_id))
+    if not channel:
+        return
+
+    from db import get_late_ranking
     ranking = get_late_ranking()
     if not ranking:
         return
@@ -40,8 +72,11 @@ async def weekly_ranking(bot):
     await channel.send(msg)
 
 
+@daily_check.before_loop
+async def before_daily():
+    await asyncio.sleep(0)
+
+
 @weekly_ranking.before_loop
-async def before_weekly_ranking():
-    import discord
-    # 봇이 준비될 때까지 대기
-    pass
+async def before_weekly():
+    await asyncio.sleep(0)
