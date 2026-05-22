@@ -4,5 +4,35 @@
     "name": "지나",
     "session_date": "2026-05-23",
     "minutes": 15
+  },
+  {
+    "member_id": "1130181994903515267",
+    "name": "지나",
+    "session_date": "2026-05-01",
+    "minutes": 400
+  },
+  {
+    "member_id": "1130181994903515267",
+    "name": "지나",
+    "session_date": "5/30",
+    "minutes": 10
+  },
+  {
+    "member_id": "1130181994903515267",
+    "name": "지나",
+    "session_date": "2026-05-04",
+    "minutes": 50
+  },
+  {
+    "member_id": "1130181994903515267",
+    "name": "지나",
+    "session_date": "5/20",
+    "minutes": 20
+  },
+  {
+    "member_id": "1130181994903515267",
+    "name": "지나",
+    "session_date": "5/30",
+    "minutes": 30
   }
 ]

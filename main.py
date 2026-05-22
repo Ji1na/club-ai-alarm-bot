@@ -36,7 +36,7 @@ async def register_session(ctx, *, args: str):
     title, date, time_, location = parts[0], parts[1], parts[2], parts[3]
     material_url = parts[4] if len(parts) > 4 else None
 
-    from db import save_session, get_all_members
+    from db import save_session
     session_id = save_session(title, date, time_, location, material_url)
 
     notice_channel = bot.get_channel(NOTICE_CHANNEL_ID)
@@ -53,22 +53,25 @@ async def register_session(ctx, *, args: str):
     else:
         await ctx.send(msg)
 
+    # 지각 기록 반영 개인별 DM
     from datetime import datetime
     try:
         from late_manager import make_personal_session_notice
         session_start = datetime.strptime(f"{date} {time_}", "%Y-%m-%d %H:%M")
-        members = get_all_members()
-        for m in members:
+        for member in ctx.guild.members:
+            if member.bot:
+                continue
             personal_msg = make_personal_session_notice(
                 session_title=title,
                 session_start=session_start,
                 location=location,
-                member_id=m["id"],
+                member_id=member.id,
             )
-            user = discord.utils.get(ctx.guild.members, id=m["id"])
-            if user:
-                await user.send(personal_msg)
-    except (ImportError, Exception):
+            try:
+                await member.send(personal_msg)
+            except Exception:
+                pass
+    except ImportError:
         pass
 
     await ctx.send(f"✅ 세션 등록 완료 (ID: {session_id})")
@@ -123,8 +126,10 @@ async def late_record(
         await interaction.response.send_message(
             f"✅ {member.display_name} {minutes}분 지각 기록 완료!", ephemeral=True
         )
-    except ImportError:
-        await interaction.response.send_message("❌ late_manager.py 준비 중입니다.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(
+            f"❌ 오류 발생: {e}", ephemeral=True
+        )
 
 
 @bot.tree.command(name="late_rank", description="운영진: 전체 지각 순위 확인")
@@ -133,8 +138,10 @@ async def late_rank(interaction: discord.Interaction):
         from late_manager import make_late_rank_report
         report = make_late_rank_report()
         await interaction.response.send_message(report, ephemeral=True)
-    except ImportError:
-        await interaction.response.send_message("❌ late_manager.py 준비 중입니다.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(
+            f"❌ 오류 발생: {e}", ephemeral=True
+        )
 
 
 @bot.command(name="순위")
@@ -188,32 +195,42 @@ async def upload_material(
     file: discord.Attachment
 ):
     await interaction.response.defer(ephemeral=True)
-    from material_reader import extract_text_from_discord_attachment
-    from quiz_ai import generate_quizzes
-    from db import get_all_members
+    try:
+        from material_reader import extract_text_from_discord_attachment
+        from quiz_ai import generate_quizzes
 
-    text = await extract_text_from_discord_attachment(file)
-    if not text:
-        await interaction.followup.send("❌ 파일에서 텍스트를 읽을 수 없어요.", ephemeral=True)
-        return
+        text = await extract_text_from_discord_attachment(file)
+        if not text:
+            await interaction.followup.send("❌ 파일에서 텍스트를 읽을 수 없어요.", ephemeral=True)
+            return
 
-    quizzes = await generate_quizzes(text, count=10)
-    quiz_message = "\n".join([
-        f"Q{i+1}. {q['question']}\n정답: {q['answer']}"
-        for i, q in enumerate(quizzes)
-    ])
+        quizzes = await generate_quizzes(text, count=10)
+        quiz_message = "\n".join([
+            f"Q{i+1}. {q['question']}\n정답: {q['answer']}"
+            for i, q in enumerate(quizzes)
+        ])
 
-    def split_message(msg, limit=1800):
-        return [msg[i:i+limit] for i in range(0, len(msg), limit)]
+        def split_message(msg, limit=1800):
+            return [msg[i:i+limit] for i in range(0, len(msg), limit)]
 
-    members = get_all_members()
-    for m in members:
-        user = discord.utils.get(interaction.guild.members, id=m["id"])
-        if user:
-            for chunk in split_message(quiz_message):
-                await user.send(chunk)
+        sent_count = 0
+        failed_count = 0
+        for user in interaction.guild.members:
+            if user.bot:
+                continue
+            try:
+                for chunk in split_message(quiz_message):
+                    await user.send(chunk)
+                sent_count += 1
+            except Exception:
+                failed_count += 1
 
-    await interaction.followup.send("✅ 전체 회원에게 퀴즈 DM 발송 완료!", ephemeral=True)
+        await interaction.followup.send(
+            f"✅ 퀴즈 생성 완료!\nDM 발송 성공: {sent_count}명\nDM 발송 실패: {failed_count}명",
+            ephemeral=True
+        )
+    except Exception as e:
+        await interaction.followup.send(f"❌ 오류 발생: {e}", ephemeral=True)
 
 
 @bot.command(name="도움말")
