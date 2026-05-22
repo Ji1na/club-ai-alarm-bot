@@ -51,10 +51,15 @@ async def register_session(ctx, *, args: str):
     late_members = get_late_members(threshold=int(os.getenv("EARLY_NOTIFY_COUNT", 3)))
     if late_members:
         early_time = (datetime.strptime(time_, "%H:%M") - timedelta(minutes=30)).strftime("%H:%M")
-        names = ", ".join([m["name"] for m in late_members])
-        await ctx.send(
-            f"⚠️ {names} — 지각 이력으로 인해 **{early_time}**까지 와주세요! (실제 시작: {time_})"
-        )
+        for m in late_members:
+            user = discord.utils.get(ctx.guild.members, display_name=m["name"])
+            if user:
+                await user.send(
+                    f"📢 **{title}** 세션 공지\n"
+                    f"📅 날짜: {date}\n"
+                    f"⏰ 시간: **{early_time}**\n"
+                    f"📍 장소: {location}\n"
+                )
 
     await ctx.send(f"✅ 세션 등록 완료 (ID: {session_id})")
 
@@ -100,7 +105,7 @@ async def show_ranking(ctx):
         msg += f"{medal} {row['name']} — {row['late_count']}회\n"
 
     last = ranking[-1]
-    msg += f"\n💀 현재 꼴찌: **{last['name']}** ({last['last_count']}회)"
+    msg += f"\n💀 현재 꼴찌: **{last['name']}** ({last['late_count']}회)"
     await ctx.send(msg)
 
 
