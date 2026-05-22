@@ -1,0 +1,26 @@
+# 환경변수 (절대 깃허브에 올리면 안 됨)
+.env
+
+# DB 파일
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+env/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
