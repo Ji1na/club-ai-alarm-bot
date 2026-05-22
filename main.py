@@ -26,7 +26,6 @@ async def on_ready():
     print(f"✅ 봇 실행 중: {bot.user}")
 
 
-# ── 세션 공지 ─────────────────────────────────────────────
 @bot.command(name="세션")
 async def register_session(ctx, *, args: str):
     parts = [p.strip() for p in args.split("|")]
@@ -40,7 +39,6 @@ async def register_session(ctx, *, args: str):
     from db import save_session, get_all_members
     session_id = save_session(title, date, time_, location, material_url)
 
-    # 공지 채널 전체 공지
     notice_channel = bot.get_channel(NOTICE_CHANNEL_ID)
     msg = (
         f"📢 **{title}** 세션 공지\n"
@@ -55,15 +53,12 @@ async def register_session(ctx, *, args: str):
     else:
         await ctx.send(msg)
 
-    # 개인별 DM (지각 기록 반영)
     from datetime import datetime
     try:
         from late_manager import make_personal_session_notice
-        from db import get_member_late_minutes
         session_start = datetime.strptime(f"{date} {time_}", "%Y-%m-%d %H:%M")
         members = get_all_members()
         for m in members:
-            late_minutes = get_member_late_minutes(m["id"])
             personal_msg = make_personal_session_notice(
                 session_title=title,
                 session_start=session_start,
@@ -73,13 +68,12 @@ async def register_session(ctx, *, args: str):
             user = discord.utils.get(ctx.guild.members, id=m["id"])
             if user:
                 await user.send(personal_msg)
-    except ImportError:
+    except (ImportError, Exception):
         pass
 
     await ctx.send(f"✅ 세션 등록 완료 (ID: {session_id})")
 
 
-# ── 출석 체크 ─────────────────────────────────────────────
 @bot.command(name="출석")
 async def check_attendance(ctx, session_id: int, arrived_at: str):
     if ctx.channel.id != ATTENDANCE_CHANNEL_ID:
@@ -109,11 +103,12 @@ async def check_attendance(ctx, session_id: int, arrived_at: str):
         await ctx.send(f"✅ {ctx.author.display_name} 출석 완료!")
 
 
-# ── 지각 기록 입력 (운영진) ───────────────────────────────
-@bot.tree.command(name="upload_material", description="발표자료를 업로드하고 퀴즈를 생성합니다.")
-async def upload_material(
+@bot.tree.command(name="late", description="운영진: 지각 기록 입력")
+async def late_record(
     interaction: discord.Interaction,
-    file: discord.Attachment
+    member: discord.Member,
+    minutes: int,
+    session_date: str
 ):
     try:
         from late_manager import add_late_record, make_late_record_dm
@@ -132,7 +127,6 @@ async def upload_material(
         await interaction.response.send_message("❌ late_manager.py 준비 중입니다.", ephemeral=True)
 
 
-# ── 지각 순위 (운영진) ────────────────────────────────────
 @bot.tree.command(name="late_rank", description="운영진: 전체 지각 순위 확인")
 async def late_rank(interaction: discord.Interaction):
     try:
@@ -143,7 +137,6 @@ async def late_rank(interaction: discord.Interaction):
         await interaction.response.send_message("❌ late_manager.py 준비 중입니다.", ephemeral=True)
 
 
-# ── 지각 순위 공개 ────────────────────────────────────────
 @bot.command(name="순위")
 async def show_ranking(ctx):
     from db import get_late_ranking
@@ -164,7 +157,6 @@ async def show_ranking(ctx):
     await ctx.send(msg)
 
 
-# ── 퀴즈 생성 ─────────────────────────────────────────────
 @bot.command(name="퀴즈")
 async def generate_quiz(ctx, session_id: int):
     from db import get_session
@@ -190,11 +182,9 @@ async def generate_quiz(ctx, session_id: int):
     await ctx.send(msg)
 
 
-# ── 발표자료 업로드 + 퀴즈 생성 ──────────────────────────
 @bot.tree.command(name="upload_material", description="발표자료를 업로드하고 퀴즈를 생성합니다.")
 async def upload_material(
     interaction: discord.Interaction,
-    session_id: int,
     file: discord.Attachment
 ):
     await interaction.response.defer(ephemeral=True)
@@ -213,7 +203,6 @@ async def upload_material(
         for i, q in enumerate(quizzes)
     ])
 
-    # 1800자씩 잘라서 전체 회원에게 DM
     def split_message(msg, limit=1800):
         return [msg[i:i+limit] for i in range(0, len(msg), limit)]
 
@@ -227,7 +216,6 @@ async def upload_material(
     await interaction.followup.send("✅ 전체 회원에게 퀴즈 DM 발송 완료!", ephemeral=True)
 
 
-# ── 도움말 ────────────────────────────────────────────────
 @bot.command(name="도움말")
 async def help_command(ctx):
     msg = (
@@ -237,7 +225,7 @@ async def help_command(ctx):
         "`!순위` — 지각 순위 조회\n"
         "`/late member minutes session_date` — 지각 기록 입력 (운영진)\n"
         "`/late_rank` — 전체 지각 순위 (운영진)\n"
-        "`/upload_material` — 발표자료 업로드 + 퀴즈 생성\n"
+        "`/upload_material file` — 발표자료 업로드 + 퀴즈 생성\n"
     )
     await ctx.send(msg)
 
